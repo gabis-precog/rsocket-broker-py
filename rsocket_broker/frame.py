@@ -176,29 +176,29 @@ class RouteAddFrame(Frame):
 
 class RouteRemoveFrame(Frame):
     __slots__ = (
-        'time_to_live',
-        'number_of_requests'
+        'broker_id',
+        'route_id',
+        'timestamp'
     )
 
     def __init__(self):
-        super().__init__(FrameType.LEASE)
-        self.metadata_only = True
-        self.time_to_live = None
-        self.number_of_requests = None
+        super().__init__(FrameType.ROUTE_REMOVE)
 
     def parse(self, buffer: bytes, offset: int):
         parse_header(self, buffer, offset)
         offset += HEADER_LENGTH
-        time_to_live, number_of_requests = struct.unpack_from('>II', buffer, offset)
-        self.time_to_live = time_to_live & MASK_31_BITS
-        self.number_of_requests = number_of_requests & MASK_31_BITS
-        offset += self.parse_metadata(buffer, offset + 8)
 
-    def serialize(self, middle=b'', flags=0):
-        middle = struct.pack('>II',
-                             self.time_to_live & MASK_31_BITS,
-                             self.number_of_requests & MASK_31_BITS)
-        return Frame.serialize(self, middle, flags)
+        self.broker_id = buffer[offset:offset + 16]
+        offset += 16
+        self.route_id = buffer[offset:offset + 16]
+        offset += 16
+        self.timestamp = struct.unpack('>Q', buffer[offset:offset + 8])[0]
+
+    def serialize(self, middle=b'', flags=0) -> bytes:
+        middle += self.broker_id
+        middle += self.route_id
+        middle += struct.pack('>Q', self.timestamp)
+        return Frame.serialize(self, middle)
 
 
 class BrokerInfoFrame(Frame):
@@ -232,7 +232,13 @@ class BrokerInfoFrame(Frame):
 
 class AddressFrame(Frame):
     __slots__ = (
-        'flags_follows',
+        'origin_route_id',
+        'key_value_map',
+        'flag_encrypted',
+        'flag_unicast',
+        'flag_multicast',
+        'flag_shared_routing',
+
     )
 
     def __init__(self, frame_type):
