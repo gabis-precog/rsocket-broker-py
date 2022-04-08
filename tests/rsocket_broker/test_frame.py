@@ -1,5 +1,7 @@
+from typing import cast
+
 from rsocket_broker.frame import RouteSetupFrame, FrameType, BrokerInfoFrame, RouteAddFrame, RouteRemoveFrame, \
-    AddressFrame
+    AddressFrame, parse_or_ignore
 from tests.rsocket_broker.helpers import data_bits, build_frame, bits
 
 
@@ -21,8 +23,9 @@ def test_route_setup_frame():
     ]
 
     frame_data = build_frame(*items)
-    frame = RouteSetupFrame()
-    frame.parse(frame_data, 0)
+    frame = cast(RouteSetupFrame, parse_or_ignore(frame_data))
+
+    assert isinstance(frame, RouteSetupFrame)
 
     assert frame.major_version == 0
     assert frame.minor_version == 1
@@ -51,8 +54,9 @@ def test_broker_info_frame():
     ]
 
     frame_data = build_frame(*items)
-    frame = BrokerInfoFrame()
-    frame.parse(frame_data, 0)
+    frame = cast(BrokerInfoFrame, parse_or_ignore(frame_data))
+
+    assert isinstance(frame, BrokerInfoFrame)
 
     assert frame.major_version == 0
     assert frame.minor_version == 1
@@ -84,8 +88,9 @@ def test_route_add_frame():
     ]
 
     frame_data = build_frame(*items)
-    frame = RouteAddFrame()
-    frame.parse(frame_data, 0)
+    frame = cast(RouteAddFrame, parse_or_ignore(frame_data))
+
+    assert isinstance(frame, RouteAddFrame)
 
     assert frame.major_version == 0
     assert frame.minor_version == 1
@@ -111,8 +116,9 @@ def test_route_remove_frame():
     ]
 
     frame_data = build_frame(*items)
-    frame = RouteRemoveFrame()
-    frame.parse(frame_data, 0)
+    frame = cast(RouteRemoveFrame, parse_or_ignore(frame_data))
+
+    assert isinstance(frame, RouteRemoveFrame)
 
     assert frame.major_version == 0
     assert frame.minor_version == 1
@@ -146,8 +152,9 @@ def test_address_frame():
     ]
 
     frame_data = build_frame(*items)
-    frame = AddressFrame()
-    frame.parse(frame_data, 0)
+    frame = cast(AddressFrame, parse_or_ignore(frame_data))
+
+    assert isinstance(frame, AddressFrame)
 
     assert frame.major_version == 0
     assert frame.minor_version == 1

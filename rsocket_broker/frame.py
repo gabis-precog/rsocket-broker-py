@@ -13,9 +13,6 @@ from rsocket_broker.frame_helpers import parse_key_value_map, serialize_key_valu
 PROTOCOL_MAJOR_VERSION = 0
 PROTOCOL_MINOR_VERSION = 1
 
-MASK_31_BITS = 0x7FFFFFFF
-CONNECTION_STREAM_ID = 0
-MAX_REQUEST_N = 0x7FFFFFFF
 
 _FLAG_RESERVED_BIT = 0x200
 _FLAG_ENCRYPTED_BIT = 0x100
@@ -319,9 +316,3 @@ def parse_or_ignore(buffer: bytes) -> Optional[Frame]:
         if not header.flags_ignore:
             raise RSocketProtocolError(ErrorCode.CONNECTION_ERROR, str(exception)) from exception
 
-
-def serialize_with_frame_size_header(frame: Frame) -> bytes:
-    serialized_frame = frame.serialize()
-    header = struct.pack('>I', len(serialized_frame))[1:]
-    full_frame = header + serialized_frame
-    return full_frame
