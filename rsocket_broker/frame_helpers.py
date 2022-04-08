@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Tuple
 
 from rsocket.frame_helpers import parse_type, serialize_128max_value
 from rsocket.helpers import serialize_well_known_encoding
@@ -6,8 +6,9 @@ from rsocket.helpers import serialize_well_known_encoding
 from rsocket_broker.well_known_keys import WellKnownKeys
 
 
-def parse_key_value_map(buffer: bytes, offset: int) -> Dict[bytes, bytes]:
+def parse_key_value_map(buffer: bytes, offset: int) -> Tuple[Dict[bytes, bytes], int]:
     key_value_map = {}
+
     while offset < len(buffer):
         is_known_type, tag_length = parse_type(buffer[offset:])
         offset += 1
@@ -32,7 +33,7 @@ def parse_key_value_map(buffer: bytes, offset: int) -> Dict[bytes, bytes]:
         if not has_next_value:
             break
 
-    return key_value_map
+    return key_value_map, offset
 
 
 def serialize_key_value(key_value_map) -> bytes:

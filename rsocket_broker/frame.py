@@ -2,7 +2,7 @@ import abc
 import struct
 from abc import ABCMeta
 from enum import IntEnum, unique
-from typing import Tuple, Optional
+from typing import Optional
 
 from rsocket.error_codes import ErrorCode
 from rsocket.exceptions import RSocketProtocolError, ParseError, RSocketUnknownFrameType
@@ -17,14 +17,11 @@ MASK_31_BITS = 0x7FFFFFFF
 CONNECTION_STREAM_ID = 0
 MAX_REQUEST_N = 0x7FFFFFFF
 
-_FLAG_METADATA_BIT = 0x100
-_FLAG_IGNORE_BIT = 0x200
-_FLAG_COMPLETE_BIT = 0x40
-_FLAG_FOLLOWS_BIT = 0x80
-_FLAG_LEASE_BIT = 0x40
-_FLAG_RESUME_BIT = 0x80
-_FLAG_RESPOND_BIT = 0x80
-_FLAG_NEXT_BIT = 0x20
+_FLAG_RESERVED_BIT = 0x200
+_FLAG_ENCRYPTED_BIT = 0x100
+_FLAG_UNICAST_BIT = 0x80
+_FLAG_MULTICAST_BIT = 0x40
+_FLAG_SHARED_ROUTING_BIT = 0x20
 
 
 @unique
@@ -120,7 +117,7 @@ class RouteSetupFrame(Frame):
         length, self.service_name = unpack_string(buffer, offset)
         offset += length + 1
 
-        self.key_value_map = parse_key_value_map(buffer, offset)
+        self.key_value_map, _ = parse_key_value_map(buffer, offset)
 
     def serialize(self, middle=b'', flags=0) -> bytes:
         middle += self.route_id
@@ -147,6 +144,11 @@ class RouteAddFrame(Frame):
 
     def __init__(self):
         super().__init__(FrameType.ROUTE_ADD)
+        self.service_name = None
+        self.key_value_map = {}
+        self.route_id = None
+        self.timestamp = None
+        self.broker_id = None
 
     def parse(self, buffer: bytes, offset: int):
         parse_header(self, buffer, offset)
@@ -161,7 +163,7 @@ class RouteAddFrame(Frame):
         length, self.service_name = unpack_string(buffer, offset)
         offset += length + 1
 
-        self.key_value_map = parse_key_value_map(buffer, offset)
+        self.key_value_map, _ = parse_key_value_map(buffer, offset)
 
     def serialize(self, middle=b'', flags=0) -> bytes:
         middle += self.broker_id
@@ -205,10 +207,14 @@ class BrokerInfoFrame(Frame):
     __slots__ = (
         'broker_id',
         'timestamp',
-        'key_value_map')
+        'key_value_map'
+    )
 
     def __init__(self):
-        super().__init__(FrameType.BROKER_INFO)
+        super().__init__(FrameType.ADDRESS)
+        self.broker_id = None
+        self.timestamp = None
+        self.key_value_map = {}
 
     def parse(self, buffer: bytes, offset: int):
         parse_header(self, buffer, offset)
@@ -218,7 +224,7 @@ class BrokerInfoFrame(Frame):
         offset += 16
         self.timestamp = struct.unpack('>Q', buffer[offset:offset + 8])[0]
         offset += 8
-        self.key_value_map = parse_key_value_map(buffer, offset)
+        self.key_value_map, _ = parse_key_value_map(buffer, offset)
 
     def serialize(self, middle=b'', flags: int = 0) -> bytes:
         middle += self.broker_id
@@ -238,29 +244,51 @@ class AddressFrame(Frame):
         'flag_unicast',
         'flag_multicast',
         'flag_shared_routing',
-
+        'metadata',
     )
 
-    def __init__(self, frame_type):
-        super().__init__(frame_type)
-        self.flags_follows = False
+    def __init__(self):
+        super().__init__(FrameType.ADDRESS)
+        self.origin_route_id = None
+        self.flag_encrypted = False
+        self.flag_unicast = False
+        self.flag_multicast = False
+        self.flag_shared_routing = False
+        self.key_value_map = {}
+        self.metadata = b''
 
-    def parse(self, buffer, offset: int) -> Tuple[int, int]:
+    def parse(self, buffer, offset: int):
         flags = parse_header(self, buffer, offset)
-        self.flags_follows = is_flag_set(flags, _FLAG_FOLLOWS_BIT)
-        return HEADER_LENGTH, flags
+        offset += HEADER_LENGTH
+
+        self.flag_encrypted = is_flag_set(flags, _FLAG_ENCRYPTED_BIT)
+        self.flag_unicast = is_flag_set(flags, _FLAG_UNICAST_BIT)
+        self.flag_multicast = is_flag_set(flags, _FLAG_MULTICAST_BIT)
+        self.flag_shared_routing = is_flag_set(flags, _FLAG_SHARED_ROUTING_BIT)
+
+        self.origin_route_id = buffer[offset:offset + 16]
+        offset += 16
+        self.key_value_map, offset = parse_key_value_map(buffer, offset)
+        self.metadata = buffer[offset:]
 
     def serialize(self, middle=b'', flags: int = 0) -> bytes:
-        flags &= ~_FLAG_FOLLOWS_BIT
+        flags &= ~_FLAG_ENCRYPTED_BIT
 
-        if self.flags_follows:
-            flags |= _FLAG_FOLLOWS_BIT
+        if self.flag_unicast:
+            flags |= _FLAG_UNICAST_BIT
+
+        if self.flag_multicast:
+            flags |= _FLAG_MULTICAST_BIT
+
+        if self.flag_shared_routing:
+            flags |= _FLAG_SHARED_ROUTING_BIT
+
+        middle += self.origin_route_id
+
+        middle += serialize_key_value(self.key_value_map)
+        middle += self.metadata
 
         return Frame.serialize(self, middle, flags)
-
-    def _parse_payload(self, buffer: bytes, offset: int):
-        offset += self.parse_metadata(buffer, offset)
-        offset += self.parse_data(buffer, offset)
 
 
 _frame_class_by_id = {
