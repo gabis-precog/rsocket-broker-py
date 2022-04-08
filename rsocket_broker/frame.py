@@ -6,7 +6,7 @@ from typing import Tuple, Optional
 
 from rsocket.error_codes import ErrorCode
 from rsocket.exceptions import RSocketProtocolError, ParseError, RSocketUnknownFrameType
-from rsocket.frame_helpers import (is_flag_set, unpack_32bit, unpack_string, pack_string)
+from rsocket.frame_helpers import (is_flag_set, unpack_string, pack_string)
 
 from rsocket_broker.frame_helpers import parse_key_value_map, serialize_key_value
 
@@ -137,22 +137,41 @@ class InvalidFrame:
 
 
 class RouteAddFrame(Frame):
-    __slots__ = 'error_code'
+    __slots__ = (
+        'broker_id',
+        'route_id',
+        'timestamp',
+        'service_name',
+        'key_value_map'
+    )
 
     def __init__(self):
-        super().__init__(FrameType.ERROR)
+        super().__init__(FrameType.ROUTE_ADD)
 
-    # noinspection PyAttributeOutsideInit
     def parse(self, buffer: bytes, offset: int):
         parse_header(self, buffer, offset)
         offset += HEADER_LENGTH
-        self.error_code = ErrorCode(unpack_32bit(buffer, offset))
-        offset += 4
-        offset += self.parse_data(buffer, offset)
+
+        self.broker_id = buffer[offset:offset + 16]
+        offset += 16
+        self.route_id = buffer[offset:offset + 16]
+        offset += 16
+        self.timestamp = struct.unpack('>Q', buffer[offset:offset + 8])[0]
+        offset += 8
+        length, self.service_name = unpack_string(buffer, offset)
+        offset += length + 1
+
+        self.key_value_map = parse_key_value_map(buffer, offset)
 
     def serialize(self, middle=b'', flags=0) -> bytes:
-        middle = struct.pack('>I', self.error_code)
-        return Frame.serialize(self, middle, flags)
+        middle += self.broker_id
+        middle += self.route_id
+        middle += struct.pack('>Q', self.timestamp)
+        middle += pack_string(self.service_name)
+
+        middle += serialize_key_value(self.key_value_map)
+
+        return Frame.serialize(self, middle)
 
 
 class RouteRemoveFrame(Frame):
