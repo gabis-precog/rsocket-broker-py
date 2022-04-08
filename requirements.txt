@@ -5,10 +5,5 @@ pytest-timeout==2.1.0
 asyncstdlib==3.10.3
 pytest-cov==3.0.0
 coverage==6.3.2
-Rx==3.2.0
-aiohttp==3.8.1
-quart==0.16.3
 coveralls==3.3.1
-aioquic==0.9.19
-rsocket==0.3.dev4
-Jinja2==3.0.3
+rsocket

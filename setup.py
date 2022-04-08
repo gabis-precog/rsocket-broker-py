@@ -15,12 +15,10 @@ setup(
     license='MIT',
     packages=find_packages(exclude=['examples', 'tests', 'tests.*', 'docs']),
     zip_safe=True,
+    install_requires=[
+        'rsocket'
+    ],
     python_requires='>=3.8',
-    extras_require={
-        'aiohttp': {'aiohttp >= 3.0.0'},
-        'quart': {'quart >= 0.15.0'},
-        'quic': {'aioquic >= 0.9.0'}
-    },
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Programming Language :: Python',
